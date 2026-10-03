@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#0d1013</color>
+    <color name="panel">#151a1f</color>
+    <color name="panel2">#1b2127</color>
+    <color name="line">#262d35</color>
+    <color name="text">#d7dee6</color>
+    <color name="dim">#7d8894</color>
+    <color name="green">#57c08a</color>
+    <color name="red">#e06055</color>
+    <color name="amber">#d7a44b</color>
+    <color name="blue">#6aa6f0</color>
+    <color name="btn">#202932</color>
+    <color name="btn_press">#27323d</color>
+    <color name="btn_primary">#2f6f4f</color>
+    <color name="btn_primary_press">#357c58</color>
+    <color name="btn_primary_line">#3a8560</color>
+    <color name="placeholder">#5b6570</color>
+    <color name="term_bg">#0a0d10</color>
+    <color name="term_text">#c3ccd4</color>
+    <color name="keybox_bg">#0f1a14</color>
+    <color name="keybox_line">#2c4d3a</color>
+    <color name="bar_bg">#20262d</color>
+    <color name="grid">#1d2329</color>
+    <color name="chart_area">#146aa6f0</color>
+    <color name="dot_unknown">#5b6570</color>
+    <color name="danger_text">#f0b6b0</color>
+</resources>

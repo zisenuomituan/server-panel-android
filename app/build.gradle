@@ -1,0 +1,58 @@
+plugins {
+    id 'com.android.application'
+}
+
+// 默认服务器地址：开源版回退到占位地址，可在本地用不进库的配置覆盖
+def privateProps = new Properties()
+def externalFile = new File(System.getProperty('user.home'), '.config/server-panel-android/private.properties')
+if (externalFile.exists()) {
+    externalFile.withInputStream { privateProps.load(it) }
+}
+def localFile = rootProject.file('private.properties')
+if (localFile.exists()) {
+    localFile.withInputStream { privateProps.load(it) }
+}
+def defaultServer = System.getenv('PANEL_SERVER_URL') ?: privateProps.getProperty('server.url', 'https://your-panel.example')
+
+android {
+    namespace 'com.xianyunb.serverpanel'
+    compileSdk 34
+
+    defaultConfig {
+        applicationId "com.xianyunb.serverpanel"
+        minSdk 23
+        targetSdk 34
+        versionCode 1
+        versionName "0.1.0"
+        buildConfigField "String", "DEFAULT_SERVER_URL", "\"${defaultServer}\""
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled false
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // 正式版使用 debug 签名，保证可安装
+            signingConfig signingConfigs.debug
+        }
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    // 离线环境缺少 lint 依赖，正式构建不做 lint 检查
+    lint {
+        checkReleaseBuilds false
+        abortOnError false
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
+}
