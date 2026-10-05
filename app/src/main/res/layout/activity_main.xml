@@ -38,15 +38,16 @@
             android:textSize="13sp" />
 
         <Button
-            android:id="@+id/btnLogout"
+            android:id="@+id/btnMenu"
             style="@style/Btn.Ghost"
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:minHeight="32dp"
+            android:minWidth="44dp"
             android:paddingStart="10dp"
             android:paddingEnd="10dp"
-            android:text="退出"
-            android:textSize="12sp" />
+            android:text="⋯"
+            android:textSize="18sp" />
     </LinearLayout>
 
     <View

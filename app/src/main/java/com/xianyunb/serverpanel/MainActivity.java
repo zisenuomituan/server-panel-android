@@ -9,6 +9,7 @@ import android.view.LayoutInflater;
 import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
+import android.widget.PopupMenu;
 import android.widget.TextView;
 import android.widget.Toast;
 
@@ -55,10 +56,7 @@ public class MainActivity extends AppCompatActivity {
 
         TextView who = findViewById(R.id.who);
         who.setText(session.username() + " · " + roleText(session.role()));
-        findViewById(R.id.btnLogout).setOnClickListener(v -> {
-            session.clear();
-            toLogin();
-        });
+        findViewById(R.id.btnMenu).setOnClickListener(this::showMenu);
 
         listContainer = findViewById(R.id.listContainer);
         bindInput = findViewById(R.id.bindInput);
@@ -235,6 +233,31 @@ public class MainActivity extends AppCompatActivity {
                 handler.post(() -> toast(e.getMessage()));
             }
         }).start();
+    }
+
+    private void showMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        menu.getMenu().add("个人中心");
+        if ("admin".equals(session.role())) {
+            menu.getMenu().add("管理");
+        }
+        menu.getMenu().add("操作日志");
+        menu.getMenu().add("退出登录");
+        menu.setOnMenuItemClickListener(item -> {
+            String title = item.getTitle().toString();
+            if ("个人中心".equals(title)) {
+                startActivity(new Intent(this, ProfileActivity.class));
+            } else if ("管理".equals(title)) {
+                startActivity(new Intent(this, AdminActivity.class));
+            } else if ("操作日志".equals(title)) {
+                startActivity(new Intent(this, LogsActivity.class));
+            } else if ("退出登录".equals(title)) {
+                session.clear();
+                toLogin();
+            }
+            return true;
+        });
+        menu.show();
     }
 
     private void openDetail(long serverId) {
