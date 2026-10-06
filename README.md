@@ -1,7 +1,7 @@
 # server-panel-android · 服务器面板安卓客户端
 
-[server-panel](../server-panel) 的 Android 客户端。界面与网页版保持一致（深色 + 蓝鲸蓝），
-在手机上查看宿主机/虚拟机状态、开关机、执行命令。
+[server-panel](../server-panel) 的 Android 客户端：在手机上查看宿主机与虚拟机的运行状态、
+开关机、执行命令。界面与网页版保持一致（深色 + 蓝鲸蓝）。
 
 > 团队：蓝鲸公益　开发者：zisenuomituan (xianyu)
 
@@ -15,8 +15,11 @@
   与网络吞吐（自绘折线图，无第三方图表库）。
 - **电源控制**：开机 / 关机 / 重启 / 强制关机，均带二次确认。
 - **命令行**：在详情页对虚拟机执行命令，显示真实输出与退出码。
-  手机上键盘没有方向键，命令行提供 **↑ / ↓ 按钮**翻历史命令，另有「清屏」。
+  手机键盘没有方向键，命令行提供 **↑ / ↓ 按钮**翻历史命令，另有「清屏」。
   面板关闭命令功能或只读账号时自动隐藏。
+- **个人中心**：查看账号信息、修改密码。
+- **管理员功能**：网页命令行开关、登记宿主机并生成绑定密钥、用户管理、密钥轮换与撤销。
+- **操作日志**：登录、绑定、开关机、执行命令等记录可查。
 
 ## 界面
 
@@ -45,31 +48,6 @@
 
 产物：`app/build/outputs/apk/`。
 
-本仓库**只提供源码，不提供成品 APK**：默认服务器地址、签名都由你自己的配置决定，
-请自行编译属于你自己的版本。正式包请在 `app/build.gradle` 里配置自己的 keystore
+本仓库只提供源码，不提供成品 APK。默认服务器地址是占位符，
+在 `app/build.gradle` 里改成自己的地址即可；正式包请配置自己的 keystore
 （默认回退到 debug 签名，仅方便本地安装）。
-
-## 默认服务器地址
-
-默认服务器地址是占位符 `https://your-panel.example`。如要改成自己的地址，
-可在项目根目录放一个本地、不进库的 `private.properties`：
-
-```properties
-server.url=https://panel.example.com
-```
-
-构建时写入 `BuildConfig.DEFAULT_SERVER_URL`，作为登录页的默认地址。
-也可以用环境变量 `PANEL_SERVER_URL` 覆盖，或放在
-`~/.config/server-panel-android/private.properties`（推荐，配置完全在仓库之外）。
-
-以下文件已被 `.gitignore` 排除，不会进库：`private.properties`、`local.properties`、
-`*.keystore`、`*.jks`、`build/`、`.gradle/`。
-
-## 测试
-
-在手机上安装自己编译出的 APK，服务器地址填自己的面板地址，
-登录后即可看到已绑定的宿主机与虚拟机。
-
-## 许可证
-
-Apache-2.0，见 [LICENSE](LICENSE)。第三方组件见 [THIRD_PARTY.md](THIRD_PARTY.md)。
