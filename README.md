@@ -39,10 +39,11 @@
 
 - JDK 21（17 亦可；Gradle 8.7 不支持 25；源码级别为 Java 17）
 - Android SDK（compileSdk 34）
-- Gradle 8.7
-- 非 x86_64 设备（如 aarch64 / Termux）需在 `gradle.properties` 指定系统 aapt2：
+- 用仓库自带的 Gradle wrapper 即可，无需另装 Gradle
+- x86_64 与 CI 直接 `./gradlew` 就行；**非 x86_64**（aarch64 / Termux 等）要改用系统 aapt2，
+  写在自己机器的 `~/.gradle/gradle.properties` 里（属于环境配置，不放进仓库）：
   `android.aapt2FromMavenOverride=/usr/bin/aapt2`
-- `local.properties` 指定 `sdk.dir`
+- 可选：`local.properties` 指定 `sdk.dir`
 
 命令：
 
