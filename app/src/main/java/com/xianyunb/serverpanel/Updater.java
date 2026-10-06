@@ -1,8 +1,11 @@
 package com.xianyunb.serverpanel;
 
 import android.app.Activity;
+import android.app.DownloadManager;
 import android.content.Context;
 import android.content.Intent;
+import android.content.SharedPreferences;
+import android.database.Cursor;
 import android.net.Uri;
 import android.os.Build;
 import android.provider.Settings;
@@ -15,20 +18,22 @@ import org.json.JSONObject;
 
 import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileOutputStream;
 import java.io.InputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 
 /**
- * 自用版的应用内更新：读取更新清单，下载 APK 并交给系统安装器。
- * 清单格式：{"version":"0.3.0","versionCode":3,"notes":"...","url":"https://.../app.apk"}
+ * 自用版的应用内更新。
+ *
+ * 升级包交给系统 DownloadManager 下载：退出应用不中断、有系统通知、
+ * 已经下好的包不会重复下载。清单格式：
+ * {"version":"0.3.2","versionCode":5,"notes":"...","url":"https://.../app.apk"}
  */
 public class Updater {
 
-    public interface Progress {
-        void onProgress(int percent);
-    }
+    private static final String PREF = "updater";
+    private static final String KEY_ID = "download_id";
+    private static final String KEY_VERSION = "download_version";
 
     public static void check(Activity activity, boolean silent) {
         new Thread(() -> {
@@ -53,11 +58,26 @@ public class Updater {
         String notes = m.optString("notes", "");
 
         if (remoteCode <= BuildConfig.VERSION_CODE) {
+            clearPending(activity);
             if (!silent) toast(activity, "已是最新版本 " + BuildConfig.VERSION_NAME);
             return;
         }
-        if (url.isEmpty()) {
+        if (url.isEmpty() || remoteName.isEmpty()) {
             if (!silent) toast(activity, "新版本信息不完整");
+            return;
+        }
+
+        // 已经下好同一个版本：直接装，不再重新下载
+        File apk = apkFile(activity, remoteName);
+        if (apk.exists() && apk.length() > 0) {
+            promptInstall(activity, apk, remoteName);
+            return;
+        }
+
+        // 同一版本正在后台下载：给出提示，不重复入队
+        long id = pendingId(activity, remoteName);
+        if (id > 0 && isActive(activity, id)) {
+            if (!silent) showDownloading(activity, id, remoteName);
             return;
         }
 
@@ -70,50 +90,69 @@ public class Updater {
                 .setTitle("发现新版本")
                 .setMessage(msg.toString())
                 .setNegativeButton("以后再说", null)
-                .setPositiveButton("下载更新", (d, w) -> download(activity, url, remoteName))
+                .setPositiveButton("下载更新", (d, w) -> enqueue(activity, url, remoteName))
                 .show();
     }
 
-    private static void download(Activity activity, String url, String version) {
-        final AlertDialog dialog = new AlertDialog.Builder(activity)
-                .setTitle("正在下载更新")
-                .setMessage("0%")
-                .setCancelable(false)
-                .create();
-        dialog.show();
+    private static void enqueue(Activity activity, String url, String version) {
+        DownloadManager dm = (DownloadManager) activity.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (dm == null) {
+            toast(activity, "系统下载服务不可用");
+            return;
+        }
+        DownloadManager.Request req = new DownloadManager.Request(Uri.parse(url));
+        req.setTitle("服务器面板 " + version);
+        req.setDescription("正在下载更新，退出应用也会继续");
+        req.setMimeType("application/vnd.android.package-archive");
+        req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
+        req.setDestinationInExternalFilesDir(activity, null, apkFile(activity, version).getName());
+        long id = dm.enqueue(req);
+        prefs(activity).edit().putLong(KEY_ID, id).putString(KEY_VERSION, version).apply();
+        showDownloading(activity, id, version);
+    }
 
-        new Thread(() -> {
-            try {
-                File dir = activity.getExternalFilesDir(null);
-                if (dir == null) dir = activity.getCacheDir();
-                File apk = new File(dir, "update-" + version + ".apk");
-                fetchApk(url, apk, percent ->
-                        activity.runOnUiThread(() -> dialog.setMessage(percent + "%")));
+    private static void showDownloading(Activity activity, long id, String version) {
+        int percent = progressOf(activity, id);
+        String message = percent >= 0
+                ? "已下载 " + percent + "%，在后台继续下载，退出应用不会中断。\n下完点系统通知即可安装。"
+                : "正在后台下载，退出应用不会中断。\n下完点系统通知即可安装。";
+        new AlertDialog.Builder(activity)
+                .setTitle("正在下载 " + version)
+                .setMessage(message)
+                .setNegativeButton("知道了", null)
+                .setPositiveButton("查看下载", (d, w) -> {
+                    Intent i = new Intent(DownloadManager.ACTION_VIEW_DOWNLOADS);
+                    i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+                    try {
+                        activity.startActivity(i);
+                    } catch (Exception ignored) {
+                    }
+                })
+                .show();
+    }
 
-                activity.runOnUiThread(() -> {
-                    dialog.dismiss();
+    private static void promptInstall(Activity activity, File apk, String version) {
+        new AlertDialog.Builder(activity)
+                .setTitle("更新已下载")
+                .setMessage("服务器面板 " + version + " 已下载完成，现在安装？")
+                .setNegativeButton("稍后", null)
+                .setPositiveButton("安装", (d, w) -> {
                     if (!canInstall(activity)) {
                         new AlertDialog.Builder(activity)
                                 .setMessage("需要先允许本应用安装未知来源的应用")
                                 .setNegativeButton("取消", null)
-                                .setPositiveButton("去设置", (d, w) -> openInstallSettings(activity))
+                                .setPositiveButton("去设置", (x, y) -> openInstallSettings(activity))
                                 .show();
                         return;
                     }
                     install(activity, apk);
-                });
-            } catch (Exception e) {
-                activity.runOnUiThread(() -> {
-                    dialog.dismiss();
-                    toast(activity, "下载失败：" + e.getMessage());
-                });
-            }
-        }).start();
+                })
+                .show();
     }
 
     /**
      * 清理下载残留：已装上（版本不高于当前）的安装包直接删掉；
-     * 比当前版本新的保留，可能还在等待用户安装。
+     * 比当前版本新的保留，可能还在等待安装。
      */
     public static void cleanup(Context context) {
         cleanupDir(context.getExternalFilesDir(null));
@@ -138,24 +177,66 @@ public class Updater {
         }
     }
 
-    private static int compareVersion(String a, String b) {
-        String[] pa = a.split("\\.");
-        String[] pb = b.split("\\.");
-        int n = Math.max(pa.length, pb.length);
-        for (int i = 0; i < n; i++) {
-            int va = i < pa.length ? parseIntSafe(pa[i]) : 0;
-            int vb = i < pb.length ? parseIntSafe(pb[i]) : 0;
-            if (va != vb) return va < vb ? -1 : 1;
-        }
-        return 0;
+    private static File apkFile(Context context, String version) {
+        File dir = context.getExternalFilesDir(null);
+        if (dir == null) dir = context.getCacheDir();
+        return new File(dir, "update-" + version + ".apk");
     }
 
-    private static int parseIntSafe(String s) {
+    private static SharedPreferences prefs(Context context) {
+        return context.getSharedPreferences(PREF, Context.MODE_PRIVATE);
+    }
+
+    private static long pendingId(Context context, String version) {
+        SharedPreferences p = prefs(context);
+        if (!version.equals(p.getString(KEY_VERSION, ""))) return 0;
+        return p.getLong(KEY_ID, 0);
+    }
+
+    private static void clearPending(Context context) {
+        prefs(context).edit().remove(KEY_ID).remove(KEY_VERSION).apply();
+    }
+
+    private static boolean isActive(Context context, long id) {
+        int status = statusOf(context, id);
+        return status == DownloadManager.STATUS_PENDING
+                || status == DownloadManager.STATUS_RUNNING
+                || status == DownloadManager.STATUS_PAUSED;
+    }
+
+    private static int statusOf(Context context, long id) {
+        DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (dm == null) return -1;
+        Cursor c = null;
         try {
-            return Integer.parseInt(s.trim());
-        } catch (Exception e) {
-            return 0;
+            c = dm.query(new DownloadManager.Query().setFilterById(id));
+            if (c != null && c.moveToFirst()) {
+                int idx = c.getColumnIndex(DownloadManager.COLUMN_STATUS);
+                if (idx >= 0) return c.getInt(idx);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
         }
+        return -1;
+    }
+
+    private static int progressOf(Context context, long id) {
+        DownloadManager dm = (DownloadManager) context.getSystemService(Context.DOWNLOAD_SERVICE);
+        if (dm == null) return -1;
+        Cursor c = null;
+        try {
+            c = dm.query(new DownloadManager.Query().setFilterById(id));
+            if (c != null && c.moveToFirst()) {
+                long got = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_BYTES_DOWNLOADED_SO_FAR));
+                long total = c.getLong(c.getColumnIndexOrThrow(DownloadManager.COLUMN_TOTAL_SIZE_BYTES));
+                if (total > 0) return (int) (got * 100 / total);
+            }
+        } catch (Exception ignored) {
+        } finally {
+            if (c != null) c.close();
+        }
+        return -1;
     }
 
     private static JSONObject fetchManifest(String url) throws Exception {
@@ -163,6 +244,7 @@ public class Updater {
         c.setConnectTimeout(10000);
         c.setReadTimeout(20000);
         c.setRequestProperty("Accept", "application/json");
+        c.setRequestProperty("Cache-Control", "no-cache");
         int code = c.getResponseCode();
         if (code >= 400) {
             c.disconnect();
@@ -171,38 +253,6 @@ public class Updater {
         String text = readAll(c.getInputStream());
         c.disconnect();
         return new JSONObject(text);
-    }
-
-    private static void fetchApk(String url, File dest, Progress progress) throws Exception {
-        HttpURLConnection c = (HttpURLConnection) new URL(url).openConnection();
-        c.setConnectTimeout(15000);
-        c.setReadTimeout(60000);
-        int code = c.getResponseCode();
-        if (code >= 400) {
-            c.disconnect();
-            throw new Exception("请求失败 " + code);
-        }
-        int total = c.getContentLength();
-        InputStream in = c.getInputStream();
-        FileOutputStream out = new FileOutputStream(dest);
-        byte[] buf = new byte[8192];
-        long got = 0;
-        int last = -1;
-        int n;
-        while ((n = in.read(buf)) != -1) {
-            out.write(buf, 0, n);
-            got += n;
-            if (total > 0 && progress != null) {
-                int percent = (int) (got * 100 / total);
-                if (percent != last) {
-                    last = percent;
-                    progress.onProgress(percent);
-                }
-            }
-        }
-        out.close();
-        in.close();
-        c.disconnect();
     }
 
     private static String readAll(InputStream in) throws Exception {
@@ -238,6 +288,26 @@ public class Updater {
         i.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION);
         i.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
         context.startActivity(i);
+    }
+
+    private static int compareVersion(String a, String b) {
+        String[] pa = a.split("\\.");
+        String[] pb = b.split("\\.");
+        int n = Math.max(pa.length, pb.length);
+        for (int i = 0; i < n; i++) {
+            int va = i < pa.length ? parseIntSafe(pa[i]) : 0;
+            int vb = i < pb.length ? parseIntSafe(pb[i]) : 0;
+            if (va != vb) return va < vb ? -1 : 1;
+        }
+        return 0;
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private static void toast(Context context, String msg) {
