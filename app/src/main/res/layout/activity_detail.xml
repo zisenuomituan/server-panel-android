@@ -416,6 +416,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:textColor="@color/term_text"
+                        android:textIsSelectable="true"
                         android:textSize="12sp" />
                 </ScrollView>
 

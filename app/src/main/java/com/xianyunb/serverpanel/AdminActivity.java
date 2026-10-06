@@ -1,6 +1,9 @@
 package com.xianyunb.serverpanel;
 
+import android.content.ClipData;
+import android.content.ClipboardManager;
 import android.graphics.Typeface;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -76,6 +79,7 @@ public class AdminActivity extends AppCompatActivity {
 
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnCreateHost).setOnClickListener(v -> createHost());
+        findViewById(R.id.btnCopyKey).setOnClickListener(v -> copyKey());
         findViewById(R.id.btnCreateUser).setOnClickListener(v -> createUser());
         cbExec.setOnCheckedChangeListener((v, checked) -> {
             if (settingLoaded) saveSettings(checked);
@@ -158,6 +162,23 @@ public class AdminActivity extends AppCompatActivity {
                 handler.post(() -> toast(e.getMessage()));
             }
         }).start();
+    }
+
+    private void copyKey() {
+        String key = hostKeyOut.getText().toString().trim();
+        if (key.isEmpty()) {
+            toast("还没有可复制的密钥");
+            return;
+        }
+        ClipboardManager cm = (ClipboardManager) getSystemService(CLIPBOARD_SERVICE);
+        if (cm == null) {
+            toast("系统剪贴板不可用");
+            return;
+        }
+        cm.setPrimaryClip(ClipData.newPlainText("bind key", key));
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU) {
+            toast("密钥已复制");
+        }
     }
 
     private void showKey(String formatted) {

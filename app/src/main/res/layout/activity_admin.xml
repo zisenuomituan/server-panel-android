@@ -148,6 +148,7 @@
                         android:layout_height="wrap_content"
                         android:fontFamily="monospace"
                         android:textColor="@color/green"
+                        android:textIsSelectable="true"
                         android:textSize="15sp" />
 
                     <TextView
@@ -157,6 +158,14 @@
                         android:text="这是唯一的明文展示，请复制保存。密钥 32 位，可被多个账号绑定。"
                         android:textColor="@color/dim"
                         android:textSize="12sp" />
+
+                    <Button
+                        android:id="@+id/btnCopyKey"
+                        style="@style/Btn"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:layout_marginTop="10dp"
+                        android:text="复制密钥" />
                 </LinearLayout>
             </LinearLayout>
 
