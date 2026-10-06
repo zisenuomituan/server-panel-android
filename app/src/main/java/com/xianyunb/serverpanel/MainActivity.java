@@ -1,6 +1,8 @@
 package com.xianyunb.serverpanel;
 
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
@@ -41,6 +43,8 @@ public class MainActivity extends AppCompatActivity {
     private boolean loading;
     private boolean paused;
     private boolean firstLoadDone;
+    private int alertCount;
+    private long lastAlertFetch;
 
     private final Runnable tick = () -> loadHosts();
 
@@ -72,6 +76,18 @@ public class MainActivity extends AppCompatActivity {
         if (BuildConfig.SELF_USE) {
             Updater.cleanup(this);
             Updater.check(this, true);
+        }
+
+        // 告警：申请通知权限并开启后台定时检查
+        requestNotificationPermission();
+        AlertWatcher.start(this);
+    }
+
+    private void requestNotificationPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
+                && checkSelfPermission("android.permission.POST_NOTIFICATIONS")
+                != PackageManager.PERMISSION_GRANTED) {
+            requestPermissions(new String[]{"android.permission.POST_NOTIFICATIONS"}, 100);
         }
     }
 
@@ -105,6 +121,14 @@ public class MainActivity extends AppCompatActivity {
                 data = parseHosts(api.getArray("/hosts"));
             } catch (Exception e) {
                 err = e.getMessage();
+            }
+            // 每 30 秒顺带取一次告警数，用于菜单角标
+            if (System.currentTimeMillis() - lastAlertFetch > 30_000L) {
+                lastAlertFetch = System.currentTimeMillis();
+                try {
+                    alertCount = api.getObj("/alerts/summary").optInt("active", 0);
+                } catch (Exception ignored) {
+                }
             }
             final List<Host> result = data;
             final String error = err;
@@ -254,23 +278,34 @@ public class MainActivity extends AppCompatActivity {
 
     private void showMenu(View anchor) {
         PopupMenu menu = new PopupMenu(this, anchor);
-        menu.getMenu().add("个人中心");
+        menu.getMenu().add(0, 1, 0, "个人中心");
+        menu.getMenu().add(0, 2, 1, alertCount > 0 ? "告警（" + alertCount + "）" : "告警");
         if ("admin".equals(session.role())) {
-            menu.getMenu().add("管理");
+            menu.getMenu().add(0, 3, 2, "管理");
         }
-        menu.getMenu().add("操作日志");
-        menu.getMenu().add("退出登录");
+        menu.getMenu().add(0, 4, 3, "操作日志");
+        menu.getMenu().add(0, 5, 4, "退出登录");
         menu.setOnMenuItemClickListener(item -> {
-            String title = item.getTitle().toString();
-            if ("个人中心".equals(title)) {
-                startActivity(new Intent(this, ProfileActivity.class));
-            } else if ("管理".equals(title)) {
-                startActivity(new Intent(this, AdminActivity.class));
-            } else if ("操作日志".equals(title)) {
-                startActivity(new Intent(this, LogsActivity.class));
-            } else if ("退出登录".equals(title)) {
-                session.clear();
-                toLogin();
+            switch (item.getItemId()) {
+                case 1:
+                    startActivity(new Intent(this, ProfileActivity.class));
+                    break;
+                case 2:
+                    startActivity(new Intent(this, AlertsActivity.class));
+                    break;
+                case 3:
+                    startActivity(new Intent(this, AdminActivity.class));
+                    break;
+                case 4:
+                    startActivity(new Intent(this, LogsActivity.class));
+                    break;
+                case 5:
+                    AlertWatcher.stop(this);
+                    session.clear();
+                    toLogin();
+                    break;
+                default:
+                    break;
             }
             return true;
         });

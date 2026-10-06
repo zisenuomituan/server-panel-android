@@ -3,6 +3,7 @@
 
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 
     <application
         android:allowBackup="true"
@@ -41,6 +42,14 @@
 
         <activity
             android:name=".AdminActivity"
+            android:exported="false" />
+
+        <activity
+            android:name=".AlertsActivity"
+            android:exported="false" />
+
+        <receiver
+            android:name=".AlertReceiver"
             android:exported="false" />
 
         <provider
