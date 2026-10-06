@@ -70,11 +70,11 @@ public class Updater {
                 .setTitle("发现新版本")
                 .setMessage(msg.toString())
                 .setNegativeButton("以后再说", null)
-                .setPositiveButton("下载更新", (d, w) -> download(activity, url))
+                .setPositiveButton("下载更新", (d, w) -> download(activity, url, remoteName))
                 .show();
     }
 
-    private static void download(Activity activity, String url) {
+    private static void download(Activity activity, String url, String version) {
         final AlertDialog dialog = new AlertDialog.Builder(activity)
                 .setTitle("正在下载更新")
                 .setMessage("0%")
@@ -86,7 +86,7 @@ public class Updater {
             try {
                 File dir = activity.getExternalFilesDir(null);
                 if (dir == null) dir = activity.getCacheDir();
-                File apk = new File(dir, "update.apk");
+                File apk = new File(dir, "update-" + version + ".apk");
                 fetchApk(url, apk, percent ->
                         activity.runOnUiThread(() -> dialog.setMessage(percent + "%")));
 
@@ -109,6 +109,53 @@ public class Updater {
                 });
             }
         }).start();
+    }
+
+    /**
+     * 清理下载残留：已装上（版本不高于当前）的安装包直接删掉；
+     * 比当前版本新的保留，可能还在等待用户安装。
+     */
+    public static void cleanup(Context context) {
+        cleanupDir(context.getExternalFilesDir(null));
+        cleanupDir(context.getCacheDir());
+    }
+
+    private static void cleanupDir(File dir) {
+        if (dir == null) return;
+        File[] files = dir.listFiles();
+        if (files == null) return;
+        for (File f : files) {
+            String name = f.getName();
+            if ("update.apk".equals(name)) {
+                f.delete();
+                continue;
+            }
+            if (!name.startsWith("update-") || !name.endsWith(".apk")) continue;
+            String version = name.substring("update-".length(), name.length() - ".apk".length());
+            if (compareVersion(version, BuildConfig.VERSION_NAME) <= 0) {
+                f.delete();
+            }
+        }
+    }
+
+    private static int compareVersion(String a, String b) {
+        String[] pa = a.split("\\.");
+        String[] pb = b.split("\\.");
+        int n = Math.max(pa.length, pb.length);
+        for (int i = 0; i < n; i++) {
+            int va = i < pa.length ? parseIntSafe(pa[i]) : 0;
+            int vb = i < pb.length ? parseIntSafe(pb[i]) : 0;
+            if (va != vb) return va < vb ? -1 : 1;
+        }
+        return 0;
+    }
+
+    private static int parseIntSafe(String s) {
+        try {
+            return Integer.parseInt(s.trim());
+        } catch (Exception e) {
+            return 0;
+        }
     }
 
     private static JSONObject fetchManifest(String url) throws Exception {

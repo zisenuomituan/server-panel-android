@@ -68,8 +68,9 @@ public class MainActivity extends AppCompatActivity {
         // 首次进入先给出加载提示，避免一片空白
         listContainer.addView(emptyText("正在加载…", 40));
 
-        // 自用版启动时静默检查一次更新
+        // 自用版启动时静默检查一次更新，并清掉已安装版本的残留安装包
         if (BuildConfig.SELF_USE) {
+            Updater.cleanup(this);
             Updater.check(this, true);
         }
     }
