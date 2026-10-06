@@ -96,6 +96,30 @@
                     android:text="确认修改" />
             </LinearLayout>
 
+            <LinearLayout
+                android:id="@+id/updatePanel"
+                style="@style/Panel"
+                android:visibility="gone">
+
+                <TextView
+                    style="@style/PanelTitle"
+                    android:text="版本" />
+
+                <LinearLayout
+                    android:id="@+id/versionContainer"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="vertical" />
+
+                <Button
+                    android:id="@+id/btnCheckUpdate"
+                    style="@style/Btn"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="10dp"
+                    android:text="检查更新" />
+            </LinearLayout>
+
             <TextView
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"

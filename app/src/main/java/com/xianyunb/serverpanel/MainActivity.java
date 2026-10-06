@@ -61,6 +61,11 @@ public class MainActivity extends AppCompatActivity {
         listContainer = findViewById(R.id.listContainer);
         bindInput = findViewById(R.id.bindInput);
         findViewById(R.id.btnBind).setOnClickListener(v -> doBind());
+
+        // 自用版启动时静默检查一次更新
+        if (BuildConfig.SELF_USE) {
+            Updater.check(this, true);
+        }
     }
 
     @Override

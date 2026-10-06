@@ -3,6 +3,7 @@ package com.xianyunb.serverpanel;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.view.View;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.TextView;
@@ -19,6 +20,10 @@ public class ProfileActivity extends AppCompatActivity {
     private Api api;
     private LinearLayout kvContainer;
     private EditText pwdOld, pwdNew;
+
+    private View updatePanel;
+    private LinearLayout versionContainer;
+    private String panelVersion = "";
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -37,10 +42,44 @@ public class ProfileActivity extends AppCompatActivity {
         kvContainer = findViewById(R.id.kvContainer);
         pwdOld = findViewById(R.id.pwdOld);
         pwdNew = findViewById(R.id.pwdNew);
+        updatePanel = findViewById(R.id.updatePanel);
+        versionContainer = findViewById(R.id.versionContainer);
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnChangePwd).setOnClickListener(v -> changePassword());
 
+        // 版本信息与检查更新只在自用版启用
+        if (BuildConfig.SELF_USE) {
+            updatePanel.setVisibility(View.VISIBLE);
+            renderVersions();
+            findViewById(R.id.btnCheckUpdate).setOnClickListener(v -> Updater.check(this, false));
+            loadConfig();
+        }
+
         loadMe();
+    }
+
+    private void loadConfig() {
+        new Thread(() -> {
+            String version = "";
+            try {
+                JSONObject c = api.getObj("/config");
+                version = c.optString("version", "");
+            } catch (Exception ignored) {
+            }
+            final String v = version;
+            handler.post(() -> {
+                panelVersion = v;
+                renderVersions();
+            });
+        }).start();
+    }
+
+    private void renderVersions() {
+        versionContainer.removeAllViews();
+        addRowInto(versionContainer, "App 版本",
+                BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）");
+        addRowInto(versionContainer, "面板版本",
+                panelVersion.isEmpty() ? "-" : panelVersion);
     }
 
     private void loadMe() {
@@ -71,6 +110,10 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private void addRow(String k, String v) {
+        addRowInto(kvContainer, k, v);
+    }
+
+    private void addRowInto(LinearLayout container, String k, String v) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, dp(4), 0, dp(4));
@@ -88,7 +131,7 @@ public class ProfileActivity extends AppCompatActivity {
 
         row.addView(kk);
         row.addView(vv);
-        kvContainer.addView(row);
+        container.addView(row);
     }
 
     private void changePassword() {

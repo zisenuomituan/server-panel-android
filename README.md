@@ -32,7 +32,7 @@
 
 环境：
 
-- JDK 17
+- JDK 21（17 亦可；Gradle 8.7 不支持 25；源码级别为 Java 17）
 - Android SDK（compileSdk 34）
 - Gradle 8.7
 - 非 x86_64 设备（如 aarch64 / Termux）需在 `gradle.properties` 指定系统 aapt2：
