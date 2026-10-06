@@ -25,4 +25,5 @@
     <color name="chart_area">#146aa6f0</color>
     <color name="dot_unknown">#5b6570</color>
     <color name="danger_text">#f0b6b0</color>
+    <color name="ic_launcher_background">#0d1013</color>
 </resources>
