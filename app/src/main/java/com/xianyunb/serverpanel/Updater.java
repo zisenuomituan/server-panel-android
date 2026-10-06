@@ -67,18 +67,22 @@ public class Updater {
             return;
         }
 
-        // 已经下好同一个版本：直接装，不再重新下载
-        File apk = apkFile(activity, remoteName);
-        if (apk.exists() && apk.length() > 0) {
-            promptInstall(activity, apk, remoteName);
-            return;
-        }
-
-        // 同一版本正在后台下载：给出提示，不重复入队
+        // 1) 同一版本正在后台下载：只提示进度，不重复入队
         long id = pendingId(activity, remoteName);
         if (id > 0 && isActive(activity, id)) {
             if (!silent) showDownloading(activity, id, remoteName);
             return;
+        }
+
+        // 2) 已经下好而且是完整安装包：直接装
+        File apk = apkFile(activity, remoteName);
+        if (apk.exists() && apk.length() > 0) {
+            if (isValidApk(activity, apk)) {
+                promptInstall(activity, apk, remoteName);
+                return;
+            }
+            // 半截文件（下载中断或还没写完），删掉重下
+            apk.delete();
         }
 
         StringBuilder msg = new StringBuilder();
@@ -105,7 +109,9 @@ public class Updater {
         req.setDescription("正在下载更新，退出应用也会继续");
         req.setMimeType("application/vnd.android.package-archive");
         req.setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED);
-        req.setDestinationInExternalFilesDir(activity, null, apkFile(activity, version).getName());
+        File dest = apkFile(activity, version);
+        if (dest.exists()) dest.delete();
+        req.setDestinationInExternalFilesDir(activity, null, dest.getName());
         long id = dm.enqueue(req);
         prefs(activity).edit().putLong(KEY_ID, id).putString(KEY_VERSION, version).apply();
         showDownloading(activity, id, version);
@@ -129,6 +135,16 @@ public class Updater {
                     }
                 })
                 .show();
+    }
+
+    /** 文件必须能解析成安装包，避免把没下完的半截文件拿去安装。 */
+    private static boolean isValidApk(Context context, File apk) {
+        try {
+            return context.getPackageManager()
+                    .getPackageArchiveInfo(apk.getAbsolutePath(), 0) != null;
+        } catch (Exception e) {
+            return false;
+        }
     }
 
     private static void promptInstall(Activity activity, File apk, String version) {
@@ -155,11 +171,11 @@ public class Updater {
      * 比当前版本新的保留，可能还在等待安装。
      */
     public static void cleanup(Context context) {
-        cleanupDir(context.getExternalFilesDir(null));
-        cleanupDir(context.getCacheDir());
+        cleanupDir(context, context.getExternalFilesDir(null));
+        cleanupDir(context, context.getCacheDir());
     }
 
-    private static void cleanupDir(File dir) {
+    private static void cleanupDir(Context context, File dir) {
         if (dir == null) return;
         File[] files = dir.listFiles();
         if (files == null) return;
@@ -171,7 +187,8 @@ public class Updater {
             }
             if (!name.startsWith("update-") || !name.endsWith(".apk")) continue;
             String version = name.substring("update-".length(), name.length() - ".apk".length());
-            if (compareVersion(version, BuildConfig.VERSION_NAME) <= 0) {
+            // 已装上版本的残留，或者根本不是完整的安装包，都清掉
+            if (compareVersion(version, BuildConfig.VERSION_NAME) <= 0 || !isValidApk(context, f)) {
                 f.delete();
             }
         }
