@@ -33,12 +33,14 @@ public class MainActivity extends AppCompatActivity {
     private Api api;
     private LinearLayout listContainer;
     private EditText bindInput;
+    private View loadingBar;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<Long, ServerCard> cards = new HashMap<>();
     private String structureSig = "";
     private boolean loading;
     private boolean paused;
+    private boolean firstLoadDone;
 
     private final Runnable tick = () -> loadHosts();
 
@@ -60,7 +62,11 @@ public class MainActivity extends AppCompatActivity {
 
         listContainer = findViewById(R.id.listContainer);
         bindInput = findViewById(R.id.bindInput);
+        loadingBar = findViewById(R.id.loadingBar);
         findViewById(R.id.btnBind).setOnClickListener(v -> doBind());
+
+        // 首次进入先给出加载提示，避免一片空白
+        listContainer.addView(emptyText("正在加载…", 40));
 
         // 自用版启动时静默检查一次更新
         if (BuildConfig.SELF_USE) {
@@ -90,6 +96,7 @@ public class MainActivity extends AppCompatActivity {
     private void loadHosts() {
         if (loading) return;
         loading = true;
+        if (loadingBar != null) loadingBar.setVisibility(View.VISIBLE);
         new Thread(() -> {
             List<Host> data = null;
             String err = null;
@@ -102,6 +109,8 @@ public class MainActivity extends AppCompatActivity {
             final String error = err;
             handler.post(() -> {
                 loading = false;
+                firstLoadDone = true;
+                if (loadingBar != null) loadingBar.setVisibility(View.GONE);
                 if (result != null) render(result);
                 else if (error != null) toast(error);
                 schedule();
@@ -144,7 +153,9 @@ public class MainActivity extends AppCompatActivity {
         LayoutInflater inflater = LayoutInflater.from(this);
 
         if (hosts.isEmpty()) {
-            listContainer.addView(emptyText("还没有绑定宿主机，在上方输入密钥即可绑定。", 40));
+            listContainer.addView(emptyText(firstLoadDone
+                    ? "还没有绑定宿主机，在上方输入密钥即可绑定。"
+                    : "正在加载…", 40));
             return;
         }
 

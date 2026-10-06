@@ -21,7 +21,9 @@ public class LoginActivity extends AppCompatActivity {
     private View loginBox, registerBox;
     private TextView tabLogin, tabRegister, error;
     private Button btnLogin, btnRegister;
+    private View loginProgress, registerProgress;
     private Session session;
+    private boolean registerMode;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -48,6 +50,8 @@ public class LoginActivity extends AppCompatActivity {
         error = findViewById(R.id.error);
         btnLogin = findViewById(R.id.btnLogin);
         btnRegister = findViewById(R.id.btnRegister);
+        loginProgress = findViewById(R.id.loginProgress);
+        registerProgress = findViewById(R.id.registerProgress);
 
         addr.setText(session.baseUrl().isEmpty() ? BuildConfig.DEFAULT_SERVER_URL : session.baseUrl());
 
@@ -65,6 +69,7 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void setTab(boolean register) {
+        registerMode = register;
         loginBox.setVisibility(register ? View.GONE : View.VISIBLE);
         registerBox.setVisibility(register ? View.VISIBLE : View.GONE);
         tabLogin.setSelected(!register);
@@ -144,7 +149,10 @@ public class LoginActivity extends AppCompatActivity {
     private void setBusy(boolean busy) {
         btnLogin.setEnabled(!busy);
         btnRegister.setEnabled(!busy);
-        btnLogin.setText(busy ? "请稍候…" : "进入面板");
+        btnLogin.setText(busy && !registerMode ? "登录中…" : "进入面板");
+        btnRegister.setText(busy && registerMode ? "创建中…" : "创建账号");
+        loginProgress.setVisibility(busy && !registerMode ? View.VISIBLE : View.GONE);
+        registerProgress.setVisibility(busy && registerMode ? View.VISIBLE : View.GONE);
     }
 
     private void openMain() {

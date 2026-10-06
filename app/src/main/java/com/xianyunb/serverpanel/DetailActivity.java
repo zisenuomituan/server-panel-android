@@ -96,6 +96,9 @@ public class DetailActivity extends AppCompatActivity {
         chartRes = findViewById(R.id.chartRes);
         chartNet = findViewById(R.id.chartNet);
 
+        title.setText("加载中…");
+        subtitle.setText("正在获取数据…");
+
         commandPanel = findViewById(R.id.commandPanel);
         termScroll = findViewById(R.id.termScroll);
         termOut = findViewById(R.id.termOut);

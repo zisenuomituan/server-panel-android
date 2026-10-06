@@ -37,6 +37,8 @@ public class LogsActivity extends AppCompatActivity {
 
         logsContainer = findViewById(R.id.logsContainer);
         empty = findViewById(R.id.empty);
+        empty.setText("正在加载…");
+        empty.setVisibility(View.VISIBLE);
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnRefresh).setOnClickListener(v -> load());
 
@@ -44,6 +46,10 @@ public class LogsActivity extends AppCompatActivity {
     }
 
     private void load() {
+        if (logsContainer.getChildCount() == 0) {
+            empty.setText("正在加载…");
+            empty.setVisibility(View.VISIBLE);
+        }
         new Thread(() -> {
             JSONArray logs = null;
             String err = null;
@@ -64,6 +70,7 @@ public class LogsActivity extends AppCompatActivity {
     private void render(JSONArray logs) {
         logsContainer.removeAllViews();
         if (logs.length() == 0) {
+            empty.setText("还没有日志");
             empty.setVisibility(View.VISIBLE);
             return;
         }

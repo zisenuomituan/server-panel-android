@@ -40,6 +40,7 @@ public class ProfileActivity extends AppCompatActivity {
         api.setToken(session.token());
 
         kvContainer = findViewById(R.id.kvContainer);
+        kvContainer.addView(loadingHint());
         pwdOld = findViewById(R.id.pwdOld);
         pwdNew = findViewById(R.id.pwdNew);
         updatePanel = findViewById(R.id.updatePanel);
@@ -100,8 +101,15 @@ public class ProfileActivity extends AppCompatActivity {
         }).start();
     }
 
-    private void renderAccount(JSONObject u) {
-        kvContainer.removeAllViews();
+    private TextView loadingHint() {
+        TextView tv = new TextView(this);
+        tv.setText("正在加载…");
+        tv.setTextColor(ContextCompat.getColor(this, R.color.dim));
+        tv.setTextSize(14);
+        return tv;
+    }
+
+    private void renderAccount(JSONObject u) {        kvContainer.removeAllViews();
         addRow("用户名", u.optString("username", "-"));
         addRow("角色", roleText(u.optString("role", "")));
         String email = u.optString("email", "");

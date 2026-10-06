@@ -85,6 +85,9 @@ public class AdminActivity extends AppCompatActivity {
             if (settingLoaded) saveSettings(checked);
         });
 
+        usersContainer.addView(hint("正在加载…"));
+        keysContainer.addView(hint("正在加载…"));
+
         loadSettings();
         loadUsers();
         loadKeys();
