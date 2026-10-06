@@ -40,10 +40,14 @@
 
 ```sh
 ./gradlew assembleDebug     # 调试包
-./gradlew assembleRelease   # 正式包（当前用 debug 签名，保证可安装）
+./gradlew assembleRelease   # 正式包
 ```
 
 产物：`app/build/outputs/apk/`。
+
+本仓库**只提供源码，不提供成品 APK**：默认服务器地址、签名都由你自己的配置决定，
+请自行编译属于你自己的版本。正式包请在 `app/build.gradle` 里配置自己的 keystore
+（默认回退到 debug 签名，仅方便本地安装）。
 
 ## 默认服务器地址
 
@@ -63,7 +67,7 @@ server.url=https://panel.example.com
 
 ## 测试
 
-在手机上安装 APK，服务器地址填自己的面板地址（或自用版默认地址），
+在手机上安装自己编译出的 APK，服务器地址填自己的面板地址，
 登录后即可看到已绑定的宿主机与虚拟机。
 
 ## 许可证
