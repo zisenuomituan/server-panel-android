@@ -6,9 +6,12 @@ import android.os.Build;
 import android.os.Bundle;
 import android.os.Handler;
 import android.os.Looper;
+import android.text.Editable;
+import android.text.TextWatcher;
 import android.view.Gravity;
 import android.view.LayoutInflater;
 import android.view.View;
+import android.widget.Button;
 import android.widget.EditText;
 import android.widget.LinearLayout;
 import android.widget.PopupMenu;
@@ -23,6 +26,7 @@ import org.json.JSONArray;
 import org.json.JSONObject;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -31,11 +35,21 @@ public class MainActivity extends AppCompatActivity {
 
     private static final long POLL_MS = 5000;
 
+    private static final String[] FILTER_VALUES = {"all", "running", "stopped"};
+    private static final String[] FILTER_LABELS = {"全部", "仅运行中", "仅已停止"};
+    private static final String[] FILTER_SHORT = {"全部", "运行中", "已停止"};
+    private static final String[] SORT_VALUES = {"host", "name", "cpu", "mem"};
+    private static final String[] SORT_LABELS = {"按宿主机（默认）", "按名称", "按 CPU 占用", "按内存占用"};
+    private static final String[] SORT_SHORT = {"默认", "名称", "CPU", "内存"};
+
     private Session session;
     private Api api;
     private LinearLayout listContainer;
     private EditText bindInput;
+    private EditText searchInput;
     private View loadingBar;
+    private Button btnFilter;
+    private Button btnSort;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
     private final Map<Long, ServerCard> cards = new HashMap<>();
@@ -45,6 +59,12 @@ public class MainActivity extends AppCompatActivity {
     private boolean firstLoadDone;
     private int alertCount;
     private long lastAlertFetch;
+
+    // 列表视图状态：搜索 / 筛选 / 排序（只影响显示，不影响轮询到的原始数据）
+    private String searchQuery = "";
+    private String stateFilter = "all";
+    private String sortMode = "host";
+    private List<Host> lastHosts = new ArrayList<>();
 
     private final Runnable tick = () -> loadHosts();
 
@@ -68,6 +88,29 @@ public class MainActivity extends AppCompatActivity {
         bindInput = findViewById(R.id.bindInput);
         loadingBar = findViewById(R.id.loadingBar);
         findViewById(R.id.btnBind).setOnClickListener(v -> doBind());
+
+        // 搜索 / 筛选 / 排序
+        searchInput = findViewById(R.id.searchInput);
+        btnFilter = findViewById(R.id.btnFilter);
+        btnSort = findViewById(R.id.btnSort);
+        searchInput.addTextChangedListener(new TextWatcher() {
+            @Override
+            public void beforeTextChanged(CharSequence s, int start, int count, int after) {
+            }
+
+            @Override
+            public void onTextChanged(CharSequence s, int start, int before, int count) {
+                searchQuery = s.toString().trim().toLowerCase();
+                render(lastHosts);
+            }
+
+            @Override
+            public void afterTextChanged(Editable s) {
+            }
+        });
+        btnFilter.setOnClickListener(this::showFilterMenu);
+        btnSort.setOnClickListener(this::showSortMenu);
+        renderToolbarText();
 
         // 首次进入先给出加载提示，避免一片空白
         listContainer.addView(emptyText("正在加载…", 40));
@@ -153,17 +196,21 @@ public class MainActivity extends AppCompatActivity {
     }
 
     private void render(List<Host> hosts) {
+        lastHosts = hosts;
+        List<Host> view = applyView(hosts);
+
         StringBuilder sig = new StringBuilder();
-        for (Host h : hosts) {
+        sig.append(searchQuery).append('|').append(stateFilter).append('|').append(sortMode).append('|');
+        for (Host h : view) {
             sig.append('#').append(h.id);
             for (Server s : h.servers) sig.append(',').append(s.id);
             sig.append(';');
         }
         if (!sig.toString().equals(structureSig)) {
             structureSig = sig.toString();
-            rebuild(hosts);
+            rebuild(view);
         } else {
-            for (Host h : hosts) {
+            for (Host h : view) {
                 for (Server s : h.servers) {
                     ServerCard card = cards.get(s.id);
                     if (card != null) card.bind(s, s.live);
@@ -172,15 +219,135 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    /** 按当前搜索词 / 筛选 / 排序生成要展示的列表（不改动原始数据）。 */
+    private List<Host> applyView(List<Host> hosts) {
+        boolean noCondition = searchQuery.isEmpty() && "all".equals(stateFilter);
+        List<Host> out = new ArrayList<>();
+        for (Host h : hosts) {
+            List<Server> kept = new ArrayList<>();
+            for (Server s : h.servers) {
+                if (matchState(s) && matchQuery(h, s)) kept.add(s);
+            }
+            if (kept.isEmpty() && !noCondition) continue;
+            Host copy = new Host();
+            copy.id = h.id;
+            copy.name = h.name;
+            copy.sshHost = h.sshHost;
+            copy.sshUser = h.sshUser;
+            copy.libvirtUri = h.libvirtUri;
+            copy.status = h.status;
+            copy.sshPort = h.sshPort;
+            copy.servers.addAll(kept);
+            sortServers(copy.servers);
+            out.add(copy);
+        }
+        if ("name".equals(sortMode)) {
+            Collections.sort(out, (a, b) -> a.name.compareToIgnoreCase(b.name));
+        }
+        return out;
+    }
+
+    private boolean matchState(Server s) {
+        if ("all".equals(stateFilter)) return true;
+        boolean running = s.live != null && s.live.isRunning();
+        return "running".equals(stateFilter) == running;
+    }
+
+    private boolean matchQuery(Host h, Server s) {
+        if (searchQuery.isEmpty()) return true;
+        if (hit(s.name) || hit(s.domainName) || hit(h.name) || hit(h.sshHost)) return true;
+        if (s.live != null) {
+            if (hit(s.live.hostname)) return true;
+            for (String ip : s.live.ips) {
+                if (hit(ip)) return true;
+            }
+        }
+        return false;
+    }
+
+    private boolean hit(String v) {
+        return v != null && v.toLowerCase().contains(searchQuery);
+    }
+
+    private void sortServers(List<Server> list) {
+        if ("name".equals(sortMode)) {
+            Collections.sort(list, (a, b) -> a.name.compareToIgnoreCase(b.name));
+        } else if ("cpu".equals(sortMode)) {
+            Collections.sort(list, (a, b) -> Double.compare(cpuOf(b), cpuOf(a)));
+        } else if ("mem".equals(sortMode)) {
+            Collections.sort(list, (a, b) -> Double.compare(memOf(b), memOf(a)));
+        }
+    }
+
+    private double cpuOf(Server s) {
+        return s.live == null ? 0 : s.live.cpuPct();
+    }
+
+    private double memOf(Server s) {
+        return s.live == null ? 0 : s.live.memPct();
+    }
+
+    private void renderToolbarText() {
+        String fl = "筛选";
+        String sl = "排序";
+        for (int i = 0; i < FILTER_VALUES.length; i++) {
+            if (FILTER_VALUES[i].equals(stateFilter) && i > 0) fl = "筛选：" + FILTER_SHORT[i];
+        }
+        for (int i = 0; i < SORT_VALUES.length; i++) {
+            if (SORT_VALUES[i].equals(sortMode) && i > 0) sl = "排序：" + SORT_SHORT[i];
+        }
+        btnFilter.setText(fl);
+        btnSort.setText(sl);
+    }
+
+    private void showFilterMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        if (!searchQuery.isEmpty()) {
+            menu.getMenu().add(0, 1, 0, "清除搜索");
+        }
+        for (int i = 0; i < FILTER_VALUES.length; i++) {
+            String mark = FILTER_VALUES[i].equals(stateFilter) ? "  ✓" : "";
+            menu.getMenu().add(0, 10 + i, i + 1, FILTER_LABELS[i] + mark);
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id == 1) {
+                searchInput.setText("");
+            } else if (id >= 10 && id < 10 + FILTER_VALUES.length) {
+                stateFilter = FILTER_VALUES[id - 10];
+                renderToolbarText();
+                render(lastHosts);
+            }
+            return true;
+        });
+        menu.show();
+    }
+
+    private void showSortMenu(View anchor) {
+        PopupMenu menu = new PopupMenu(this, anchor);
+        for (int i = 0; i < SORT_VALUES.length; i++) {
+            String mark = SORT_VALUES[i].equals(sortMode) ? "  ✓" : "";
+            menu.getMenu().add(0, 20 + i, i, SORT_LABELS[i] + mark);
+        }
+        menu.setOnMenuItemClickListener(item -> {
+            int id = item.getItemId();
+            if (id >= 20 && id < 20 + SORT_VALUES.length) {
+                sortMode = SORT_VALUES[id - 20];
+                renderToolbarText();
+                render(lastHosts);
+            }
+            return true;
+        });
+        menu.show();
+    }
+
     private void rebuild(List<Host> hosts) {
         listContainer.removeAllViews();
         cards.clear();
         LayoutInflater inflater = LayoutInflater.from(this);
 
         if (hosts.isEmpty()) {
-            listContainer.addView(emptyText(firstLoadDone
-                    ? "还没有绑定宿主机，在上方输入密钥即可绑定。"
-                    : "正在加载…", 40));
+            listContainer.addView(emptyText(viewEmptyText(), 40));
             return;
         }
 
@@ -216,6 +383,14 @@ public class MainActivity extends AppCompatActivity {
             gap.setLayoutParams(new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, dp(16)));
             listContainer.addView(gap);
         }
+    }
+
+    /** 列表为空时该说什么：搜索/筛选无结果、还是真的没绑定宿主机。 */
+    private String viewEmptyText() {
+        if (!searchQuery.isEmpty() || !"all".equals(stateFilter)) {
+            return "没有符合条件的虚拟机";
+        }
+        return firstLoadDone ? "还没有绑定宿主机，在上方输入密钥即可绑定。" : "正在加载…";
     }
 
     private TextView emptyText(String text, int topDp) {
@@ -302,6 +477,7 @@ public class MainActivity extends AppCompatActivity {
                 case 5:
                     AlertWatcher.stop(this);
                     session.clear();
+                    PanelConfig.clear();
                     toLogin();
                     break;
                 default:

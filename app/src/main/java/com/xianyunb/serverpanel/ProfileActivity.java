@@ -19,6 +19,7 @@ public class ProfileActivity extends AppCompatActivity {
     private Session session;
     private Api api;
     private LinearLayout kvContainer;
+    private LinearLayout panelContainer;
     private EditText pwdOld, pwdNew;
 
     private View updatePanel;
@@ -41,6 +42,8 @@ public class ProfileActivity extends AppCompatActivity {
 
         kvContainer = findViewById(R.id.kvContainer);
         kvContainer.addView(loadingHint());
+        panelContainer = findViewById(R.id.panelContainer);
+        panelContainer.addView(loadingHint());
         pwdOld = findViewById(R.id.pwdOld);
         pwdNew = findViewById(R.id.pwdNew);
         updatePanel = findViewById(R.id.updatePanel);
@@ -48,12 +51,14 @@ public class ProfileActivity extends AppCompatActivity {
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnChangePwd).setOnClickListener(v -> changePassword());
 
+        // 面板侧配置（告警开关、命令行开关）两种版本都要显示：它决定 App 能做什么
+        loadConfig();
+
         // 版本信息与检查更新只在自用版启用
         if (BuildConfig.SELF_USE) {
             updatePanel.setVisibility(View.VISIBLE);
             renderVersions();
             findViewById(R.id.btnCheckUpdate).setOnClickListener(v -> Updater.check(this, false));
-            loadConfig();
         }
 
         loadMe();
@@ -61,26 +66,39 @@ public class ProfileActivity extends AppCompatActivity {
 
     private void loadConfig() {
         new Thread(() -> {
-            String version = "";
-            try {
-                JSONObject c = api.getObj("/config");
-                version = c.optString("version", "");
-            } catch (Exception ignored) {
-            }
-            final String v = version;
+            final PanelConfig p = PanelConfig.fetch(api);
             handler.post(() -> {
-                panelVersion = v;
-                renderVersions();
+                if (p != null) {
+                    panelVersion = p.panelVersion;
+                    renderVersions();
+                }
+                renderPanel(p);
             });
         }).start();
+    }
+
+    private void renderPanel(PanelConfig p) {
+        panelContainer.removeAllViews();
+        if (p == null) {
+            addRowInto(panelContainer, "面板版本", "读取失败", R.color.red);
+            panelContainer.addView(hintText("拉取面板配置失败，请检查网络或登录状态。"));
+            return;
+        }
+        addRowInto(panelContainer, "面板版本", p.panelVersion.isEmpty() ? "-" : p.panelVersion, 0);
+        addRowInto(panelContainer, "告警通知", p.alertSwitchText(),
+                p.alertsEnabled ? R.color.green : R.color.amber);
+        panelContainer.addView(hintText(p.alertDetail()));
+        addRowInto(panelContainer, "命令行", p.enableExec ? "已开启" : "已关闭",
+                p.enableExec ? R.color.green : R.color.amber);
+        panelContainer.addView(hintText(p.execDetail()));
     }
 
     private void renderVersions() {
         versionContainer.removeAllViews();
         addRowInto(versionContainer, "App 版本",
-                BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）");
+                BuildConfig.VERSION_NAME + "（" + BuildConfig.VERSION_CODE + "）", 0);
         addRowInto(versionContainer, "面板版本",
-                panelVersion.isEmpty() ? "-" : panelVersion);
+                panelVersion.isEmpty() ? "-" : panelVersion, 0);
     }
 
     private void loadMe() {
@@ -109,7 +127,18 @@ public class ProfileActivity extends AppCompatActivity {
         return tv;
     }
 
-    private void renderAccount(JSONObject u) {        kvContainer.removeAllViews();
+    private TextView hintText(String text) {
+        TextView tv = new TextView(this);
+        tv.setText(text);
+        tv.setTextColor(ContextCompat.getColor(this, R.color.dim));
+        tv.setTextSize(12);
+        tv.setLineSpacing(dp(2), 1f);
+        tv.setPadding(0, dp(2), 0, dp(6));
+        return tv;
+    }
+
+    private void renderAccount(JSONObject u) {
+        kvContainer.removeAllViews();
         addRow("用户名", u.optString("username", "-"));
         addRow("角色", roleText(u.optString("role", "")));
         String email = u.optString("email", "");
@@ -118,10 +147,14 @@ public class ProfileActivity extends AppCompatActivity {
     }
 
     private void addRow(String k, String v) {
-        addRowInto(kvContainer, k, v);
+        addRowInto(kvContainer, k, v, 0);
     }
 
     private void addRowInto(LinearLayout container, String k, String v) {
+        addRowInto(container, k, v, 0);
+    }
+
+    private void addRowInto(LinearLayout container, String k, String v, int colorRes) {
         LinearLayout row = new LinearLayout(this);
         row.setOrientation(LinearLayout.HORIZONTAL);
         row.setPadding(0, dp(4), 0, dp(4));
@@ -134,7 +167,7 @@ public class ProfileActivity extends AppCompatActivity {
 
         TextView vv = new TextView(this);
         vv.setText(v);
-        vv.setTextColor(ContextCompat.getColor(this, R.color.text));
+        vv.setTextColor(ContextCompat.getColor(this, colorRes == 0 ? R.color.text : colorRes));
         vv.setTextSize(14);
 
         row.addView(kk);

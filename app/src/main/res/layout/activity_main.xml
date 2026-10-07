@@ -84,6 +84,53 @@
             android:text="绑定" />
     </LinearLayout>
 
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:gravity="center_vertical"
+        android:orientation="horizontal"
+        android:paddingStart="12dp"
+        android:paddingTop="4dp"
+        android:paddingEnd="12dp"
+        android:paddingBottom="8dp">
+
+        <EditText
+            android:id="@+id/searchInput"
+            style="@style/Input"
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:hint="搜索虚拟机 / IP / 宿主机"
+            android:imeOptions="actionSearch"
+            android:inputType="text"
+            android:maxLines="1"
+            android:minHeight="36dp" />
+
+        <Button
+            android:id="@+id/btnFilter"
+            style="@style/Btn.Ghost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:minHeight="36dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="筛选"
+            android:textSize="12sp" />
+
+        <Button
+            android:id="@+id/btnSort"
+            style="@style/Btn.Ghost"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginStart="6dp"
+            android:minHeight="36dp"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:text="排序"
+            android:textSize="12sp" />
+    </LinearLayout>
+
     <View
         android:layout_width="match_parent"
         android:layout_height="1dp"

@@ -23,6 +23,8 @@ public class AlertsActivity extends AppCompatActivity {
     private Api api;
     private LinearLayout alertsContainer;
     private TextView empty;
+    private TextView offHint;
+    private PanelConfig config;
 
     private final Handler handler = new Handler(Looper.getMainLooper());
 
@@ -40,9 +42,14 @@ public class AlertsActivity extends AppCompatActivity {
 
         alertsContainer = findViewById(R.id.alertsContainer);
         empty = findViewById(R.id.empty);
+        offHint = findViewById(R.id.alertOffHint);
         findViewById(R.id.btnBack).setOnClickListener(v -> finish());
         findViewById(R.id.btnRefresh).setOnClickListener(v -> load());
         findViewById(R.id.btnAckAll).setOnClickListener(v -> ackAll());
+
+        // 先用缓存里的面板配置把提示显示出来，避免闪一下
+        config = PanelConfig.cached();
+        applyOffHint();
 
         load();
     }
@@ -60,19 +67,36 @@ public class AlertsActivity extends AppCompatActivity {
             } catch (Exception e) {
                 err = e.getMessage();
             }
+            // 面板是否开着告警，决定要不要给出「收不到新告警」的提示
+            final PanelConfig cfg = PanelConfig.fetch(api);
             final JSONArray result = data;
             final String error = err;
             handler.post(() -> {
+                if (cfg != null) config = cfg;
+                applyOffHint();
                 if (result != null) render(result);
                 else if (error != null) toast(error);
             });
         }).start();
     }
 
+    /** 面板关掉告警时，明确告诉用户这里为什么不会有新东西。 */
+    private void applyOffHint() {
+        boolean off = config != null && config.loaded && !config.alertsEnabled;
+        offHint.setVisibility(off ? View.VISIBLE : View.GONE);
+        if (off) {
+            offHint.setText("面板已关闭告警\nApp 不会收到新的告警提醒，下面只是历史记录。");
+        }
+    }
+
+    private boolean alertsOff() {
+        return config != null && config.loaded && !config.alertsEnabled;
+    }
+
     private void render(JSONArray arr) {
         alertsContainer.removeAllViews();
         if (arr.length() == 0) {
-            empty.setText("没有告警，一切正常");
+            empty.setText(alertsOff() ? "面板已关闭告警，暂无记录" : "没有告警，一切正常");
             empty.setVisibility(View.VISIBLE);
             return;
         }

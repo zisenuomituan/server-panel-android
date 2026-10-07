@@ -78,6 +78,18 @@
             android:orientation="vertical"
             android:padding="16dp">
 
+            <TextView
+                android:id="@+id/alertOffHint"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginBottom="12dp"
+                android:background="@drawable/bg_card"
+                android:lineSpacingExtra="2dp"
+                android:padding="12dp"
+                android:textColor="@color/amber"
+                android:textSize="13sp"
+                android:visibility="gone" />
+
             <LinearLayout
                 android:id="@+id/alertsContainer"
                 android:layout_width="match_parent"

@@ -22,16 +22,35 @@ if (selfUseProp != null) {
 }
 def manifestUrl = privateProps.getProperty('update.manifest', defaultServer + '/android/latest.json')
 
+// 正式签名：仓库里不放任何签名信息，口令从用户目录下的不进库文件读取
+def signingProps = new Properties()
+def signingFile = new File(System.getProperty('user.home'), '.config/server-panel-android/signing.properties')
+if (signingFile.exists()) {
+    signingFile.withInputStream { signingProps.load(it) }
+}
+def hasReleaseSigning = signingFile.exists() && signingProps.getProperty('storeFile')
+
 android {
     namespace 'com.xianyunb.serverpanel'
     compileSdk 34
+
+    signingConfigs {
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(signingProps.getProperty('storeFile'))
+                storePassword signingProps.getProperty('storePassword')
+                keyAlias signingProps.getProperty('keyAlias')
+                keyPassword signingProps.getProperty('keyPassword')
+            }
+        }
+    }
 
     defaultConfig {
         applicationId "com.xianyunb.serverpanel"
         minSdk 23
         targetSdk 34
-        versionCode 7
-        versionName "0.4.1"
+        versionCode 8
+        versionName "0.5.0"
         buildConfigField "String", "DEFAULT_SERVER_URL", "\"${defaultServer}\""
         buildConfigField "boolean", "SELF_USE", "${selfUse}"
         buildConfigField "String", "UPDATE_MANIFEST_URL", "\"${manifestUrl}\""
@@ -41,8 +60,8 @@ android {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
-            // 正式版使用 debug 签名，保证可安装
-            signingConfig signingConfigs.debug
+            // 有正式签名就用正式签名（自用版）；没有则回退 debug 签名，保证开源版 clone 后能直接编译安装
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
         }
     }
 
