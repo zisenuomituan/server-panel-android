@@ -64,7 +64,15 @@ public class AlertWatcher {
 
         Api api = new Api(session.baseUrl());
         api.setToken(session.token());
-        JSONObject summary = api.getObj("/alerts/summary");
+        JSONObject summary;
+        try {
+            summary = api.getObj("/alerts/summary");
+        } catch (Api.ApiException e) {
+            if (e.code == 401) {
+                stop(context); // 登录已过期：别再每 5 分钟白跑一趟
+            }
+            throw e;
+        }
 
         int unacked = summary.optInt("unacked", 0);
         long maxId = summary.optLong("max_id", 0);

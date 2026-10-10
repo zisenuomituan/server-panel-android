@@ -18,7 +18,13 @@ public class App extends Application {
         super.onCreate();
         final Handler ui = new Handler(Looper.getMainLooper());
         Api.onUnauthorized = () -> ui.post(() -> {
-            new Session(this).logout();
+            Session s = new Session(this);
+            if (!s.loggedIn()) {
+                // 已经登出过了：后台告警任务每 5 分钟还会再试一次，不能每次都弹提示
+                return;
+            }
+            s.logout();
+            AlertWatcher.stop(this); // 令牌失效后停掉后台轮询，等用户重新登录再开
             PanelConfig.clear();
             Toast.makeText(this, "登录已过期，请重新登录", Toast.LENGTH_LONG).show();
             Intent i = new Intent(this, LoginActivity.class);
