@@ -12,6 +12,9 @@ import java.nio.charset.StandardCharsets;
 
 public class Api {
 
+    /** 登录过期（401）时的统一回调，由 App 在启动时挂上：清会话 + 回登录页 */
+    public static volatile Runnable onUnauthorized;
+
     private final String baseUrl;
     private String token;
 
@@ -87,6 +90,11 @@ public class Api {
         c.disconnect();
 
         if (code >= 400) {
+            // 登录/注册自己的 401 是「账号密码不对」，不算登录过期
+            boolean authEntry = "/auth/login".equals(path) || "/auth/register".equals(path);
+            if (code == 401 && !authEntry && onUnauthorized != null) {
+                onUnauthorized.run();
+            }
             String msg = "请求失败 " + code;
             try {
                 JSONObject o = new JSONObject(text);

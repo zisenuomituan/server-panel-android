@@ -138,6 +138,7 @@ public class MainActivity extends AppCompatActivity {
     protected void onResume() {
         super.onResume();
         paused = false;
+        AutoRenew.maybe(session);
         loadHosts();
     }
 
@@ -476,7 +477,7 @@ public class MainActivity extends AppCompatActivity {
                     break;
                 case 5:
                     AlertWatcher.stop(this);
-                    session.clear();
+                    session.logout();
                     PanelConfig.clear();
                     toLogin();
                     break;
